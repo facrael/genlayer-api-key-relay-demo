@@ -1,0 +1,10 @@
+{
+  "location": {"name": "Lisbon", "country": "Portugal", "localtime": "2026-05-19 12:00"},
+  "current": {
+    "temp_c": 24.2,
+    "humidity": 61,
+    "wind_kph": 13.7,
+    "condition": {"text": "Partly cloudy", "icon": "//cdn.weatherapi.com/icon.png"},
+    "last_updated_epoch": 1770000000
+  }
+}
