@@ -8,7 +8,9 @@ The goal is to show how an Intelligent Contract can use weather data without put
 
 - `relay_service/` — FastAPI relay that owns `WEATHER_API_KEY` server-side.
 - `contracts/weather_risk_contract.py` — GenLayer-style Intelligent Contract sketch that calls the relay.
-- `tests/` — tests for input validation, response normalization, and secret stripping.
+- `tests/` — tests for input validation, response normalization, secret stripping, signed responses, expiry, and replay rejection.
+- `examples/verify_signed_response.py` — minimal verification example for a signed relay payload.
+- `examples/sample_signed_weather_response.json` — deterministic sample signed payload.
 - `threat-model.md` — attack surface and mitigations for the relay pattern.
 
 ## Why this matters for GenLayer
@@ -37,7 +39,7 @@ Run tests:
 python -m pytest -q
 ```
 
-## Sanitized response shape
+## Sanitized and signed response shape
 
 ```json
 {
@@ -49,12 +51,17 @@ python -m pytest -q
     "humidity_pct": 61,
     "wind_kph": 13.7,
     "condition": "Partly cloudy",
-    "observed_at": "2026-05-19 12:00",
+    "observed_at": "2026-05-21 09:30",
     "source": "weatherapi.com"
   },
   "integrity": {
     "schema": "weather.v1",
-    "fields": ["city", "condition", "country", "humidity_pct", "observed_at", "source", "temperature_c", "wind_kph"]
+    "fields": ["city", "condition", "country", "humidity_pct", "observed_at", "source", "temperature_c", "wind_kph"],
+    "issued_at": 1779356000,
+    "expires_at": 1810892000,
+    "nonce": "nonce_demo_001",
+    "algorithm": "hmac-sha256",
+    "signature": "..."
   }
 }
 ```
@@ -71,12 +78,29 @@ The technical contribution is not the weather API itself. It is the boundary:
 2. keep secrets only in relay environment variables;
 3. strip upstream metadata and unstable fields;
 4. return schema-tagged normalized JSON;
-5. document validator disagreement and relay-trust risks.
+5. document validator disagreement and relay-trust risks;
+6. optionally sign responses with timestamp, expiry, and nonce metadata.
+
+## Signed response extension
+
+Day 2 extends the relay with tamper-evident response envelopes. If `RELAY_SIGNING_SECRET` is configured, `/weather` returns the normal sanitized payload plus:
+
+- `issued_at` and `expires_at` for a short validity window;
+- `nonce` so clients can keep a replay cache;
+- `algorithm = hmac-sha256`;
+- `signature` over canonical JSON with the signature field removed.
+
+Verify a saved signed response:
+
+```bash
+python examples/verify_signed_response.py examples/sample_signed_weather_response.json demo-secret
+```
+
+This is not a full decentralized oracle design. It is a practical integrity layer: validators or downstream services can detect tampering, stale payloads, and replay within a chosen time window.
 
 ## Next improvements
 
-- add signed relay responses;
+- add public-key signatures instead of shared-secret HMAC for third-party verification;
 - add multiple upstream providers for cross-source comparison;
-- add replay protection and request timestamps;
 - add docker-compose for deployment;
 - add a GenLayer Studio walkthrough with screenshots/logs.

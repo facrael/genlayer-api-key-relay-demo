@@ -16,7 +16,7 @@ import uuid
 import httpx
 from fastapi import FastAPI, HTTPException
 
-from .core import build_sanitized_response, normalize_weather_payload, validate_city
+from .core import build_sanitized_response, build_signed_response, normalize_weather_payload, validate_city
 
 WEATHER_API_URL = "https://api.weatherapi.com/v1/current.json"
 
@@ -49,4 +49,13 @@ async def weather(city: str) -> dict:
         raise HTTPException(status_code=502, detail="upstream weather API failed")
 
     normalized = normalize_weather_payload(upstream.json())
-    return build_sanitized_response(normalized, request_id=f"weather_{uuid.uuid4().hex[:12]}")
+    response = build_sanitized_response(normalized, request_id=f"weather_{uuid.uuid4().hex[:12]}")
+
+    signing_secret = os.environ.get("RELAY_SIGNING_SECRET")
+    if signing_secret:
+        return build_signed_response(
+            response,
+            secret=signing_secret,
+            nonce=f"nonce_{uuid.uuid4().hex[:16]}",
+        )
+    return response

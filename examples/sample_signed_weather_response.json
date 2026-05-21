@@ -1,0 +1,31 @@
+{
+  "request_id": "weather_demo",
+  "data": {
+    "city": "Lisbon",
+    "country": "Portugal",
+    "temperature_c": 24.2,
+    "humidity_pct": 61,
+    "wind_kph": 13.7,
+    "condition": "Partly cloudy",
+    "observed_at": "2026-05-21 09:30",
+    "source": "weatherapi.com"
+  },
+  "integrity": {
+    "schema": "weather.v1",
+    "fields": [
+      "city",
+      "condition",
+      "country",
+      "humidity_pct",
+      "observed_at",
+      "source",
+      "temperature_c",
+      "wind_kph"
+    ],
+    "issued_at": 1779356000,
+    "expires_at": 1810892000,
+    "nonce": "nonce_demo_001",
+    "algorithm": "hmac-sha256",
+    "signature": "4f80241f4345842582ca5352c6ad50e4269dfcd93bf45af951fefcc41d74841e"
+  }
+}

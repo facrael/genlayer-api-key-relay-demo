@@ -6,7 +6,11 @@ consensus-friendly JSON envelope to Intelligent Contracts.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import re
+import time
 from typing import Any
 
 CITY_RE = re.compile(r"^[A-Za-zÀ-ÖØ-öø-ÿ .'-]{1,80}$")
@@ -64,3 +68,95 @@ def build_sanitized_response(normalized: dict[str, Any], *, request_id: str) -> 
             "fields": sorted(normalized.keys()),
         },
     }
+
+
+SIGNATURE_ALGORITHM = "hmac-sha256"
+DEFAULT_MAX_SIGNATURE_AGE_SECONDS = 300
+
+
+def canonical_json(value: dict[str, Any]) -> str:
+    """Return deterministic JSON bytes-as-text for signing and verification.
+
+    Validator-facing signatures must not depend on Python dict insertion order or
+    whitespace. This format is compact, sorted, and UTF-8 safe.
+    """
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def sign_payload(payload: dict[str, Any], *, secret: str) -> str:
+    """Sign a canonical payload with the relay signing secret."""
+    if not secret:
+        raise ValueError("missing signing secret")
+    return hmac.new(secret.encode("utf-8"), canonical_json(payload).encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def build_signed_response(
+    response: dict[str, Any],
+    *,
+    secret: str,
+    issued_at: int | None = None,
+    expires_in: int = DEFAULT_MAX_SIGNATURE_AGE_SECONDS,
+    nonce: str,
+) -> dict[str, Any]:
+    """Attach timestamp, expiry, nonce, and signature metadata to a relay response."""
+    issued = int(time.time()) if issued_at is None else int(issued_at)
+    signed = {
+        **response,
+        "integrity": {
+            **response["integrity"],
+            "issued_at": issued,
+            "expires_at": issued + int(expires_in),
+            "nonce": nonce,
+            "algorithm": SIGNATURE_ALGORITHM,
+        },
+    }
+    signed["integrity"]["signature"] = sign_payload(_signature_payload(signed), secret=secret)
+    return signed
+
+
+def verify_signed_response(
+    signed: dict[str, Any],
+    *,
+    secret: str,
+    now: int | None = None,
+    seen_nonces: set[str] | None = None,
+) -> bool:
+    """Verify signature, expiry, and optional replay nonce.
+
+    A real validator/client can keep `seen_nonces` for the consensus window to
+    reject replayed relay responses.
+    """
+    integrity = signed.get("integrity") or {}
+    signature = integrity.get("signature")
+    if not isinstance(signature, str) or not signature:
+        raise ValueError("missing signature")
+    if integrity.get("algorithm") != SIGNATURE_ALGORITHM:
+        raise ValueError("unsupported signature algorithm")
+
+    current_time = int(time.time()) if now is None else int(now)
+    issued_at = int(integrity["issued_at"])
+    expires_at = int(integrity["expires_at"])
+    if issued_at > current_time + 30:
+        raise ValueError("signature issued in the future")
+    if expires_at < current_time:
+        raise ValueError("signature expired")
+
+    nonce = integrity.get("nonce")
+    if not isinstance(nonce, str) or not nonce:
+        raise ValueError("missing nonce")
+    if seen_nonces is not None:
+        if nonce in seen_nonces:
+            raise ValueError("replayed nonce")
+        seen_nonces.add(nonce)
+
+    expected = sign_payload(_signature_payload(signed), secret=secret)
+    if not hmac.compare_digest(expected, signature):
+        raise ValueError("invalid signature")
+    return True
+
+
+def _signature_payload(signed: dict[str, Any]) -> dict[str, Any]:
+    """Return the signed material with the signature field removed."""
+    integrity = dict(signed["integrity"])
+    integrity.pop("signature", None)
+    return {**signed, "integrity": integrity}

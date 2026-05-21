@@ -1,9 +1,9 @@
-# Building a Private API Key Relay for GenLayer Intelligent Contracts
+# Signed Relay Responses for GenLayer Intelligent Contracts
 
-I built a small relay pattern for GenLayer Intelligent Contracts that need external APIs without exposing API keys. The first demo uses weather data, but the pattern is meant for any API-backed contract: price feeds, social media checks, compliance lookups, routing data, or project-specific private APIs.
+I extended the private API-key relay with signed responses. The relay still keeps `WEATHER_API_KEY` server-side and returns a normalized `weather.v1` payload, but now it can also attach timestamp, expiry, nonce, algorithm, and signature metadata when `RELAY_SIGNING_SECRET` is configured.
 
-The relay keeps `WEATHER_API_KEY` server-side, validates the requested city, calls the upstream API, and returns only a normalized `weather.v1` JSON object. The Intelligent Contract sketch consumes that sanitized response and makes a simple weather-risk decision. The key point is the boundary: the contract sees useful external data, while the upstream secret never appears in contract code, calldata, validator prompts, or returned JSON.
+Technically, the signing layer canonicalizes the JSON response, removes the `signature` field from the signed material, and signs the remaining payload with HMAC-SHA256. The repo includes a verification helper, a sample signed payload, a GenLayer-style contract sketch that rejects unsigned or tampered data, and tests for valid signatures, tampered payloads, expired signatures, and replayed nonces.
 
-The main gotcha is that hiding the API key does not magically remove trust. The relay can still lie, fail, censor, or return data at a different time to different validators. That is why the repo includes a threat model covering API-key leakage, input injection, schema drift, validator disagreement, stale data, and relay tampering.
+The main gotcha is that a signature proves relay-origin and payload integrity, not truth. A signed relay can still sign wrong data, omit unfavorable data, or query at a bad time. For GenLayer builders, signatures are useful because they narrow the failure mode: validators can separate “payload was modified or stale” from “the trusted relay produced a bad answer.”
 
-The next step is to make the relay responses signed and cache them by time window, so validators can compare the same payload instead of racing a live API. For GenLayer builders, this kind of service layer feels like common infrastructure: not a full oracle network, but a practical pattern for safely connecting Intelligent Contracts to private-key APIs.
+The next technical milestone is to replace shared-secret HMAC with public-key signatures and add cache windows by `(city, time_window)`, so independent validators can verify the same signed response without needing relay secrets.

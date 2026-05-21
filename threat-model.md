@@ -45,8 +45,12 @@ Mitigation:
 
 Risk: the relay fabricates safe weather when conditions are unsafe.
 
-Mitigations not yet implemented:
-- sign relay responses;
+Mitigations implemented in Day 2:
+- sign relay responses when `RELAY_SIGNING_SECRET` is configured;
+- sign canonical JSON so field order and whitespace cannot change verification;
+- reject tampered payloads in tests.
+
+Still-needed mitigations:
 - query multiple providers;
 - include timestamped raw-response hash;
 - publish relay code and deployment metadata.
@@ -57,6 +61,8 @@ Risk: validators query at different times and receive different weather.
 
 Mitigations:
 - response includes `observed_at`;
+- signed envelopes include `issued_at`, `expires_at`, and `nonce`;
+- verification can reject expired payloads and replayed nonces;
 - future version should add relay-side caching by `(city, time_window)`;
 - contracts should use tolerance windows instead of exact equality for live data.
 
@@ -70,7 +76,7 @@ Mitigations:
 
 ## Open specification questions for GenLayer builders
 
-1. Should relays sign responses, or should validators fetch directly from the same upstream?
+1. Should relays use public-key signatures so validators can verify without shared secrets?
 2. What cache window is acceptable for subjective external data?
 3. Should contracts store raw response hashes for later audit?
 4. How should validators treat disagreement caused by live API timing?
