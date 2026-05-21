@@ -104,3 +104,18 @@ This is not a full decentralized oracle design. It is a practical integrity laye
 - add multiple upstream providers for cross-source comparison;
 - add docker-compose for deployment;
 - add a GenLayer Studio walkthrough with screenshots/logs.
+
+
+## Completed 7-day Builder track package
+
+This repo now contains the full one-week GenLayer Builder artifact sequence:
+
+1. Private API-key relay for weather data.
+2. Signed relay responses with timestamp, expiry, nonce, and tamper/replay tests.
+3. API consistency benchmark and cache-window recommendation report.
+4. External-data attack surface report.
+5. Price-feed relay variant with `price.v1` schema and contract sketch.
+6. Studio debugging UX spec for subjective execution.
+7. MVP milestone report packaging the relay kit as a reusable project.
+
+Submission-ready files are in `submissions/`.
